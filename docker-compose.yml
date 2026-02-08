@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:6-jammy
+    container_name: education-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password123
+      MONGO_INITDB_DATABASE: live-education
+    volumes:
+      - mongodb_data:/data/db
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: education-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+
+  # Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: education-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - NODE_ENV=production
+      - PORT=5000
+      - MONGODB_URI=mongodb://admin:password123@mongodb:27017/live-education?authSource=admin
+      - REDIS_URL=redis://redis:6379
+      - JWT_SECRET=your-super-secret-key-change-in-production
+      - FRONTEND_URL=http://localhost:3000
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+
+  # Frontend (Development)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: education-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:5000/api
+      - REACT_APP_SOCKET_URL=http://localhost:5000
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+
+volumes:
+  mongodb_data:
+  redis_data:
